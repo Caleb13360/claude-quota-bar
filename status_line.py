@@ -11,6 +11,7 @@ import subprocess
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 SCRIPT_DIR = Path(__file__).parent
 CACHE_PATH = SCRIPT_DIR / "data" / "usage_cache.json"
@@ -106,8 +107,6 @@ def _pct_color(pct: int) -> tuple[int, int, int]:
 
 def _reset_countdown(reset_str: str) -> str:
     """Convert a reset time string like '7 m (Australia/Hobart)' into 'Xh Ym'."""
-    import zoneinfo
-
     tz_match = re.search(r"\(([^)]+)\)", reset_str)
     tz_name = tz_match.group(1).strip() if tz_match else None
 
@@ -116,7 +115,7 @@ def _reset_countdown(reset_str: str) -> str:
     clean = re.sub(r"(\d+)\s+pm\b", r"\1pm", clean)
 
     try:
-        tz = zoneinfo.ZoneInfo(tz_name) if tz_name else None
+        tz = ZoneInfo(tz_name) if tz_name else None
     except Exception:
         tz = None
 
