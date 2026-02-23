@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Installer for claude-quota-bar.
-Hooks status_line.py into Claude Code's settings.
+Hooks status_line.py and scrape_usage.sh into Claude Code's settings.
 """
 
 import json
@@ -14,7 +14,6 @@ def main():
     project_dir = Path(__file__).parent.resolve()
     claude_settings = Path.home() / ".claude" / "settings.json"
 
-    # Require Python 3.10+ (for match/union types in status_line.py)
     if sys.version_info < (3, 10):
         print("Python 3.10+ is required.")
         sys.exit(1)
@@ -29,18 +28,44 @@ def main():
     else:
         settings = {}
 
-    # Wire up the status line command
+    scrape_cmd = f"bash {project_dir / 'scrape_usage.sh'}"
+
+    # Wire up the status line
     settings["statusLine"] = {
         "type": "command",
-        "command": f"python3 {project_dir / 'status_line.py'}",
+        "command": f'python3 "{project_dir / "status_line.py"}"',
     }
+
+    # Wire up Stop hook to refresh usage data after each response
+    stop_hook = {
+        "hooks": [
+            {
+                "type": "command",
+                "command": scrape_cmd,
+            }
+        ]
+    }
+
+    # Preserve existing hooks, append ours
+    hooks = settings.get("hooks", {})
+    stop_hooks = hooks.get("Stop", [])
+
+    # Remove any existing scrape hook we installed previously
+    stop_hooks = [h for h in stop_hooks if scrape_cmd not in json.dumps(h)]
+    stop_hooks.append(stop_hook)
+
+    hooks["Stop"] = stop_hooks
+    settings["hooks"] = hooks
 
     claude_settings.parent.mkdir(exist_ok=True)
     with open(claude_settings, "w") as f:
         json.dump(settings, f, indent=2)
 
     print(f"Updated {claude_settings}")
-    print("Done — restart Claude Code to see the status line.")
+    print("Installed:")
+    print(f"  - Status line: python3 {project_dir / 'status_line.py'}")
+    print(f"  - Stop hook:   {scrape_cmd}")
+    print("Restart Claude Code to activate.")
 
 
 if __name__ == "__main__":

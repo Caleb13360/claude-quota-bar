@@ -9,41 +9,24 @@ import json
 import re
 import subprocess
 import sys
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent
 CACHE_PATH = SCRIPT_DIR / "data" / "usage_cache.json"
-SCRAPE_SCRIPT = SCRIPT_DIR / "scrape_usage.sh"
-CACHE_MAX_AGE = 30  # seconds
 
 
 # ── usage cache ──────────────────────────────────────────────
 
 def _get_usage() -> dict | None:
-    """Load cached usage data. Trigger background scrape if stale."""
-    data = None
+    """Load cached usage data. Scraping is handled by the Stop hook."""
     try:
         if CACHE_PATH.exists():
             with open(CACHE_PATH) as f:
-                data = json.load(f)
+                return json.load(f)
     except Exception:
         pass
-
-    stale = data is None or (time.time() - data.get("scraped_at", 0)) > CACHE_MAX_AGE
-    if stale:
-        try:
-            subprocess.Popen(
-                ["bash", str(SCRAPE_SCRIPT)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-            )
-        except Exception:
-            pass
-
-    return data
+    return None
 
 
 # ── git info ─────────────────────────────────────────────────

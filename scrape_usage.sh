@@ -1,6 +1,6 @@
 #!/bin/bash
 # Scrapes claude /usage and writes JSON to data/usage_cache.json
-# Run this in the background from the status line script.
+# Run this in the background (e.g. via Claude Code Stop hook).
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CACHE_FILE="$SCRIPT_DIR/data/usage_cache.json"
@@ -21,10 +21,6 @@ trap 'rm -f "$LOCK_FILE"' EXIT
 # Find a trusted project directory (most recently modified jsonl)
 TRUSTED_DIR=$(find ~/.claude/projects -name '*.jsonl' -printf '%T@ %h\n' 2>/dev/null | sort -rn | head -1 | awk '{print $2}')
 if [ -n "$TRUSTED_DIR" ]; then
-    # Convert Claude's dir name to real path
-    # e.g. "-home-caleb-Documents-dev-The-Grills-Gauntlet" -> try to find it
-    DIR_NAME=$(basename "$TRUSTED_DIR")
-    # The project path is stored in the jsonl files, extract it
     REAL_PATH=$(tail -1 "$(ls -t "$TRUSTED_DIR"/*.jsonl 2>/dev/null | head -1)" 2>/dev/null | python3 -c "import sys,json; print(json.loads(sys.stdin.readline()).get('cwd',''))" 2>/dev/null)
     if [ -d "$REAL_PATH" ]; then
         cd "$REAL_PATH"
@@ -33,11 +29,11 @@ fi
 
 mkdir -p "$SCRIPT_DIR/data"
 
-# Capture claude /usage output via script
+# Capture claude /usage output via PTY
 TMPFILE=$(mktemp /tmp/claude_usage_XXXXXX.txt)
-env -u CLAUDECODE TERM=xterm-256color timeout 15 script -qc "claude /usage" "$TMPFILE" >/dev/null 2>&1
+env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT TERM=xterm-256color timeout 15 script -qc "claude /usage" "$TMPFILE" >/dev/null 2>&1
 
-# Parse the output with Python
+# Parse output — only overwrite cache if we got real data
 python3 -c "
 import re, json, time, sys
 
@@ -77,8 +73,10 @@ while i < len(lines):
                 break
     i += 1
 
-with open('$CACHE_FILE', 'w') as f:
-    json.dump(result, f)
+# Only write cache if we actually parsed usage data
+if any(k.endswith('_pct') for k in result):
+    with open('$CACHE_FILE', 'w') as f:
+        json.dump(result, f)
 "
 
 rm -f "$TMPFILE"
