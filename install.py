@@ -28,7 +28,7 @@ def main():
     else:
         settings = {}
 
-    scrape_cmd = f"bash {project_dir / 'scrape_usage.sh'}"
+    scrape_cmd = f'bash "{project_dir / "scrape_usage.sh"}"'
 
     # Wire up the status line
     settings["statusLine"] = {
@@ -42,6 +42,7 @@ def main():
             {
                 "type": "command",
                 "command": scrape_cmd,
+                "async": True,
             }
         ]
     }
